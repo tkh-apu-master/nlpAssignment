@@ -1,6 +1,9 @@
 from tkinter import *
 from tkinter.scrolledtext import ScrolledText
 from tkmacosx import Button
+from spellchecker import SpellChecker
+
+spell = SpellChecker()
 
 root = Tk()
 root.title('NLP Demonstration: Spelling Correction')
@@ -11,8 +14,28 @@ root.columnconfigure(1, weight=1)
 def analyze_text():
     text = user_input_textbox.get('1.0', END)
     print('text: ', text)
+    # SAMPLE TEXT: Let us wlak on the groun
     split_text = text.split()
     print('split_text: ', split_text)
+
+    misspelled = spell.unknown(split_text)
+    print('type(misspelled): ', type(misspelled))
+    print('misspelled: ', misspelled)
+    user_input_textbox.delete(1.0, 'end')
+    for original_word in split_text:
+        if original_word in misspelled:
+            # TODO: mark the word in the textbox
+            corrected_word = spell.correction(original_word)
+            user_input_textbox.insert(END, corrected_word)
+
+
+def mark_red_text(word):
+    user_input_textbox.tag_add('red', '1.0', 'end')
+    user_input_textbox.tag_config('red', foreground='red')
+
+
+def clear_tags():
+    user_input_textbox.tag_remove('red', '1.0', 'end')
 
 
 def close():
