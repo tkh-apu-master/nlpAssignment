@@ -21,21 +21,48 @@ def analyze_text():
     misspelled = spell.unknown(split_text)
     print('type(misspelled): ', type(misspelled))
     print('misspelled: ', misspelled)
-    user_input_textbox.delete(1.0, 'end')
-    for original_word in split_text:
-        if original_word in misspelled:
-            # TODO: mark the word in the textbox
-            corrected_word = spell.correction(original_word)
-            user_input_textbox.insert(END, corrected_word)
+
+    if len(misspelled) > 0:
+        print('misspelled: ', misspelled)
+        show_recommended_words(list(misspelled)[0])
+        mark_red_text()
+
+    # user_input_textbox.delete(1.0, 'end')
+    # for original_word in split_text:
+    #     if original_word in misspelled:
+    #         # TODO: mark the word in the textbox
+    #         mark_red_text()
+    #         corrected_word = spell.correction(original_word)
+    #         print('corrected_word: ', corrected_word)
+    #         user_input_textbox.insert(END, corrected_word)
+    #         show_recommended_words(original_word)
+    #         break
+
+    user_input_textbox.focus_set()
 
 
-def mark_red_text(word):
+def mark_red_text():
     user_input_textbox.tag_add('red', '1.0', 'end')
     user_input_textbox.tag_config('red', foreground='red')
 
 
 def clear_tags():
     user_input_textbox.tag_remove('red', '1.0', 'end')
+
+
+def show_recommended_words(wrong_word):
+    misspelled_word_label.config(text='Misspelled word: ' + wrong_word)
+    recommended_words = spell.candidates(wrong_word)
+    print('recommended_words: ', recommended_words)
+    listbox.delete(0, END)
+    for word in recommended_words:
+        listbox.insert(END, word)
+
+
+def search_word():
+    # TODO: search the word in the dictionary
+    print('search_word')
+    return
 
 
 def close():
@@ -75,28 +102,30 @@ user_input.grid(column=0, row=0, padx=5, pady=5)
 # Right panel
 right_panel = Frame(root, bd=1)
 right_panel.grid(column=1, row=0, sticky='nsew')
-
-# Listbox with scrollbar
-scrollbar = Scrollbar(right_panel, orient="vertical")
-listbox = Listbox(right_panel, activestyle='dotbox', yscrollcommand=scrollbar.set)
 right_panel.rowconfigure(0, weight=1)
 right_panel.columnconfigure(0, weight=1)
 
-# Sample data
-for i in range(1, 50):
-    listbox.insert(i, i)
+# Listbox with scrollbar
+misspelled_word_label = Label(right_panel, text='Misspelled word:')
+scrollbar = Scrollbar(right_panel, orient="vertical")
+listbox = Listbox(right_panel, activestyle='dotbox', yscrollcommand=scrollbar.set)
 
-listbox.grid(column=1, row=0, sticky='nsew', padx=10, pady=5)
-scrollbar.grid(column=1, row=0, sticky='nse')
+misspelled_word_label.grid(column=0, row=0, sticky='n')
+listbox.grid(column=0, row=1, sticky='new', padx=10, pady=5)
+scrollbar.grid(column=0, row=1, sticky='nse')
 
 # Search bar
 search_bar = Frame(right_panel, relief=RAISED)
+search_bar.grid(column=0, row=1, sticky='s')
+search_bar.rowconfigure(0, weight=1)
+search_bar.columnconfigure(0, weight=1)
 
 search_label = Label(search_bar, text='Search:')
-search_label.grid(column=0, row=0, sticky='se')
 search_input = Text(search_bar, height=1)
-search_input.grid(column=1, row=0, sticky='ws', padx=5, pady=5)
+search_button = Button(search_bar, text='Search', command=search_word)
 
-search_bar.grid(column=1, row=1, sticky='s')
+search_label.grid(column=0, row=0, sticky='se')
+search_input.grid(column=1, row=0, sticky='ws', padx=5, pady=5)
+search_button.grid(column=2, row=0, sticky='se')
 
 root.mainloop()
