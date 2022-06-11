@@ -5,3 +5,4 @@
 
 * pip install tkmacosx (for mac)
 * pip install pyspellchecker
+* python -m pip install -U symspellpy
