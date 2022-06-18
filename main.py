@@ -7,6 +7,21 @@ from tkmacosx import Button
 from spellchecker import SpellChecker
 from symspellpy import SymSpell
 
+# Strategy: Use Norvig with SymSpell approach, which improves speed, memory comsumption and accuracy
+# Reference: https://towardsdatascience.com/spelling-correction-how-to-make-an-accurate-and-fast-corrector-dc6d0bcbba5f
+
+# TODO: Corpora of misspellings for download
+# https://www.dcs.bbk.ac.uk/~ROGER/corpora.html
+
+# TODO: Efficient Text Data Cleaning
+# https://www.geeksforgeeks.org/python-efficient-text-data-cleaning/
+
+# TODO: TextBlob with custom training
+# https://stackabuse.com/spelling-correction-in-python-with-textblob/
+
+# TODO: Grammar Checker
+# https://www.geeksforgeeks.org/grammar-checker-in-python-using-language-check/
+
 spell = SpellChecker()
 
 sym_spell = SymSpell(max_dictionary_edit_distance=2, prefix_length=7)
@@ -17,7 +32,7 @@ bigram_path = pkg_resources.resource_filename("symspellpy", "frequency_bigramdic
 sym_spell.load_dictionary(dictionary_path, term_index=0, count_index=1)
 sym_spell.load_bigram_dictionary(bigram_path, term_index=0, count_index=2)
 
-current_sentence = ''
+# current_sentence = ''
 
 # Sample wrong sentences
 # current_sentence = 'let us wlak on the groun. it\'s weird that...'
@@ -25,6 +40,8 @@ current_sentence = ''
 #                    ' in want of a wife. However little known the feelings or views of such a man may be on his first' \
 #                    ' entering a neighbourhood, this truth is so well fixed in the minds of the surrounding families,' \
 #                    ' that he is considered as the rightful property of some one or other of their daugters.'
+# current_sentence = 'I enjoyd the event which took place yesteday &amp; I luvd it ! The link to the show is '
+current_sentence = 'http://t.co/4ftYom0i It\'s awesome you\'ll luv it #HadFun #Enjoyed BFN GN'
 current_wrong_word = ''
 recommended_words = []
 recommended_words_search_result = []
@@ -50,20 +67,17 @@ def submit():
     user_input_textbox.focus_set()
 
 
-# TODO: Analyze sentence and suggest correct spacing
+# Analyze the sentence and suggest correct word segmentation & grammar
 def check_sentence():
-    # print('Check using SymSpell: ')
-    # print('When checking as a sentence: ')
-    # suggestions = sym_spell.lookup_compound(current_sentence, max_edit_distance=2)
-    # print('suggestions: ', suggestions)
-    # for suggestion in suggestions:
-    #     print('Sentence suggestion: ', suggestion)
-    # print('When checking word by word: ')
-    # for word in split_text:
-    #     suggestions = sym_spell.lookup_compound(word, max_edit_distance=2)
-    #     print('suggestions: ', suggestions)
-    #     for suggestion in suggestions:
-    #         print(word, ' suggestion: ', suggestion)
+    print('Check using SymSpell: ')
+    print('When checking as a sentence: ')
+    suggestions = sym_spell.lookup_compound(current_sentence, max_edit_distance=2)
+    print('check_sentence suggestions: ', suggestions)
+    for suggestion in suggestions:
+        print('Sentence suggestion: ', suggestion)
+    suggestions2 = sym_spell.word_segmentation(current_sentence)
+    for suggestion2 in suggestions2:
+        print('Sentence suggestion2: ', suggestion2)
     return False
 
 
@@ -108,6 +122,13 @@ def show_recommended_words(wrong_word):
     global recommended_words
     misspelled_word_label.config(text='Misspelled word: ' + wrong_word)
     recommended_words = list(spell.candidates(wrong_word))
+
+    # Additionally, use SymSpell to find similar words
+    suggestions = sym_spell.lookup_compound(wrong_word, max_edit_distance=2)
+    for suggestion in suggestions:
+        if suggestion.term not in recommended_words:
+            recommended_words.append(suggestion.term)
+
     for word in recommended_words:
         listbox.insert(END, word)
     listbox.bind('<Double-1>', on_select)
@@ -146,6 +167,11 @@ def search_word(event):
     for word in recommended_words_search_result:
         listbox.insert(END, word)
     listbox.bind('<Double-1>', on_select)
+
+
+# A function that analyze the accuracy of the spell checker, with using misspelling corpora, and display the results.
+def spelling_corrector_analysis():
+    return
 
 
 def close():
