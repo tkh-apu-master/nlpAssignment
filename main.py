@@ -40,17 +40,20 @@ sym_spell.load_bigram_dictionary(bigram_path, term_index=0, count_index=2)
 
 # Sample wrong sentences
 # current_sentence = 'let us wlak on the groun. it\'s weird that...'
-current_sentence = 'It is a truth unіversally acknowledged, that a single man in possesssion of a good fortune must be' \
-                   ' in want of a wife. However little known the feelings or views of such a man may be on his first' \
-                   ' entering a neighbourhood, this truth is so well fixed in the minds of the surrounding families,' \
-                   ' that he is considered as the rightful property of some one or other of their daugters.'
+# current_sentence = 'It is a truth unіversally acknowledged, that a single man in possesssion of a good fortune must be' \
+#                    ' in want of a wife. However little known the feelings or views of such a man may be on his first' \
+#                    ' entering a neighbourhood, this truth is so well fixed in the minds of the surrounding families,' \
+#                    ' that he is considered as the rightful property of some one or other of their daugters.'
 # current_sentence = 'I enjoyd the event which took place yesteday &amp; I luvd it ! The link to the show is '
 # current_sentence = 'I took a message yesterday' # Testing sample real word misspellings
+# current_sentence = 'Uber app is   very bad  to use. What a mess!'
+# current_sentence = 'GFG is a good compny and alays value ttheir employes.'
+current_sentence = 'I amm goodd at spelling mstake.'
 # current_sentence = 'thequickbrownfoxjumpsoverthelazydog'
 # current_sentence = 'http://t.co/4ftYom0i It\'s awesome you\'ll luv it #HadFun #Enjoyed BFN GN'
 current_wrong_word = ''
 recommended_sentence_fixes = []
-recommended_fixes = []
+recommended_word_fixes = []
 recommended_fixes_search_result = []
 
 root = Tk()
@@ -84,20 +87,27 @@ def check_sentence():
 
     # Check word segmentation with symspell
     sentence_suggestions = sym_spell.word_segmentation(current_sentence)
-    for sentence_suggestion in sentence_suggestions:
-        print('sentence_suggestion type: ', type(sentence_suggestion))
-        print('sentence_suggestion: ', sentence_suggestion)
-        if type(sentence_suggestion) == str and \
-                sentence_suggestion != current_sentence and \
-                sentence_suggestion not in recommended_sentence_fixes:
-            recommended_sentence_fixes.append(sentence_suggestion)
+    if len(sentence_suggestions) > 0 and sentence_suggestions[0] != current_sentence:
+        # Only takes the most recommended suggestion
+        recommended_sentence_fixes.append(sentence_suggestions[0])
+
+    # for sentence_suggestion in sentence_suggestions:
+    #     print('sentence_suggestion type: ', type(sentence_suggestion))
+    #     print('sentence_suggestion: ', sentence_suggestion)
+    #     if type(sentence_suggestion) == str and \
+    #             sentence_suggestion != current_sentence and \
+    #             sentence_suggestion not in recommended_sentence_fixes:
+    #         recommended_sentence_fixes.append(sentence_suggestion)
 
     # Check if the sentence is correct with TextBlob
     textblob_sentence = TextBlob(current_sentence)
 
-    if textblob_sentence != current_sentence and \
-            textblob_sentence not in recommended_sentence_fixes:
-        recommended_sentence_fixes.append(textblob_sentence)
+    corrected_sentence = textblob_sentence.correct()
+    print('TextBlob corrected_sentence: ', corrected_sentence)
+
+    if corrected_sentence != current_sentence and \
+            corrected_sentence not in recommended_sentence_fixes:
+        recommended_sentence_fixes.append(corrected_sentence)
 
     if len(recommended_sentence_fixes) > 0:
         show_recommended_sentence()
@@ -109,15 +119,16 @@ def check_sentence():
 def analyze_text():
     global current_sentence
     global current_wrong_word
-    global recommended_fixes
+    global recommended_word_fixes
     # Split sentence into words precisely using regex: https://stackoverflow.com/a/26209841
     split_text = re.findall(r"(?<![@#])\b\w+(?:'\w+)?", current_sentence)
     misspelled = spell.unknown(split_text)
 
     if len(misspelled) > 0:
         current_wrong_word = list(misspelled)[0]
-        recommended_fixes = show_recommended_fixes(current_wrong_word)
-        display_recommended_fixes()
+        misspelled_word_label.config(text='Misspelled word: ' + current_wrong_word)
+        recommended_word_fixes = get_recommended_word_fixes(current_wrong_word)
+        display_recommended_word_fixes()
 
 
 def show_recommended_sentence():
@@ -131,13 +142,13 @@ def clear_input():
 
 
 def on_sentence_select(event):
-    selected_item = listbox.get(ANCHOR)
+    selected_item = sentence_listbox.get(ANCHOR)
     correct_misspelled_sentence(selected_item)
     submit()  # Analyze again
 
 
 def on_correct_word_select(event):
-    selected_item = listbox2.get(ANCHOR)
+    selected_item = recommended_word_listbox.get(ANCHOR)
     correct_misspelled_word(selected_item)
     submit()  # Analyze again
 
@@ -154,46 +165,48 @@ def clear_recommended_fixes():
     recommended_sentence_fixes.clear()
     misspelled_word_label.config(text='Misspelled sentence: None')
     misspelled_word_label.config(text='Misspelled word: None')
-    listbox.delete(0, END)
-    listbox.unbind('<Double-1>')
-    listbox2.delete(0, END)
-    listbox2.unbind('<Double-1>')
+    sentence_listbox.delete(0, END)
+    sentence_listbox.unbind('<Double-1>')
+    recommended_word_listbox.delete(0, END)
+    recommended_word_listbox.unbind('<Double-1>')
 
 
-def show_recommended_fixes(wrong_word):
-    misspelled_word_label.config(text='Misspelled word: ' + wrong_word)
-
+def get_recommended_word_fixes(wrong_word):
     # Get suggestions from SymSpell
-    recommended_fixes2 = list(spell.candidates(wrong_word))
+    candidates = spell.candidates(wrong_word)
+    if candidates is not None:
+        suggested_words = list(candidates)
+    else:
+        suggested_words = []
 
     # Additionally, use SymSpell to find similar words
-    suggestions = sym_spell.lookup_compound(wrong_word, max_edit_distance=2)
-    for suggestion in suggestions:
-        if suggestion.term not in recommended_fixes2:
-            recommended_fixes2.append(suggestion.term)
+    symspell_suggestions = sym_spell.lookup_compound(wrong_word, max_edit_distance=2)
+    for suggestion in symspell_suggestions:
+        if suggestion.term not in suggested_words:
+            suggested_words.append(suggestion.term)
 
     # Use TextBlob to find similar words
     w = Word(wrong_word)
-    suggestions2 = w.spellcheck()
-    for similar_word in suggestions2:
-        if similar_word not in recommended_fixes2:
-            recommended_fixes2.append(similar_word[0])
+    textblob_word_suggestions = w.spellcheck()
+    for similar_word in textblob_word_suggestions:
+        if similar_word not in suggested_words:
+            suggested_words.append(similar_word[0])
 
-    return recommended_fixes2
+    return suggested_words
 
 
 def display_recommended_sentence_fixes():
     global recommended_sentence_fixes
     for sentence in recommended_sentence_fixes:
-        listbox.insert(END, sentence)
-    listbox.bind('<Double-1>', on_sentence_select)
+        sentence_listbox.insert(END, sentence)
+    sentence_listbox.bind('<Double-1>', on_sentence_select)
 
 
-def display_recommended_fixes():
-    global recommended_fixes
-    for word in recommended_fixes:
-        listbox2.insert(END, word)
-    listbox2.bind('<Double-1>', on_correct_word_select)
+def display_recommended_word_fixes():
+    global recommended_word_fixes
+    for word in recommended_word_fixes:
+        recommended_word_listbox.insert(END, word)
+    recommended_word_listbox.bind('<Double-1>', on_correct_word_select)
 
 
 def correct_misspelled_word(corrected_word):
@@ -213,24 +226,24 @@ def correct_misspelled_sentence(corrected_sentence):
     user_input_textbox.insert(END, current_sentence)
 
 
-def search_word(event):
+def search_recommended_word(event):
     global recommended_fixes_search_result
-    listbox2.delete(0, END)
-    listbox2.unbind('<Double-1>')
+    recommended_word_listbox.delete(0, END)
+    recommended_word_listbox.unbind('<Double-1>')
     recommended_fixes_search_result.clear()
     search_keyword = search_input.get(1.0, 'end')
 
-    for i in range(len(recommended_fixes)):
-        if search_keyword in recommended_fixes[i]:
-            recommended_fixes_search_result.append(recommended_fixes[i])
+    for i in range(len(recommended_word_fixes)):
+        if search_keyword in recommended_word_fixes[i]:
+            recommended_fixes_search_result.append(recommended_word_fixes[i])
 
     # If search_keyword is empty, show all recommended words as default
     if len(search_keyword) == 1:
-        recommended_fixes_search_result.extend(recommended_fixes)
+        recommended_fixes_search_result.extend(recommended_word_fixes)
 
     for word in recommended_fixes_search_result:
-        listbox2.insert(END, word)
-    listbox2.bind('<Double-1>', on_correct_word_select)
+        recommended_word_listbox.insert(END, word)
+    recommended_word_listbox.bind('<Double-1>', on_correct_word_select)
 
 
 # A function that analyze the accuracy of the spell checker, with using misspelling corpora, and display the results.
@@ -260,7 +273,7 @@ def spelling_corrector_analysis():
     wrong_count = 0
     for mispelled_word in test_data:
         print('mispelled_word: ', mispelled_word)
-        suggestions = show_recommended_fixes(mispelled_word)
+        suggestions = get_recommended_word_fixes(mispelled_word)
         if suggestions is not None:
             print('suggestions: ', len(suggestions))
         else:
@@ -324,20 +337,20 @@ right_panel.grid(column=1, row=0, sticky='nsew')
 right_panel.rowconfigure(0, weight=1)
 right_panel.columnconfigure(0, weight=1)
 
-# Listbox with scrollbar
+# Listboxes with scrollbars
 mistake_sentence_label = Label(right_panel, text='Misspelled sentence: None')
 misspelled_word_label = Label(right_panel, text='Misspelled word:')
-scrollbar = Scrollbar(right_panel, orient='vertical')
-listbox = Listbox(right_panel, activestyle='dotbox', yscrollcommand=scrollbar.set)
-scrollbar2 = Scrollbar(right_panel, orient='vertical')
-listbox2 = Listbox(right_panel, activestyle='dotbox', yscrollcommand=scrollbar2.set)
+recommended_sentence_listbox_scrollbar = Scrollbar(right_panel, orient='vertical')
+sentence_listbox = Listbox(right_panel, activestyle='dotbox', yscrollcommand=recommended_sentence_listbox_scrollbar.set)
+recommended_word_listbox_scrollbar = Scrollbar(right_panel, orient='vertical')
+recommended_word_listbox = Listbox(right_panel, activestyle='dotbox', yscrollcommand=recommended_word_listbox_scrollbar.set)
 
 mistake_sentence_label.grid(column=0, row=0, sticky='n')
 misspelled_word_label.grid(column=0, row=2, sticky='ns')
-listbox.grid(column=0, row=1, sticky='news', padx=10)
-scrollbar.grid(column=0, row=1, sticky='nse')
-listbox2.grid(column=0, row=3, sticky='news', padx=10)
-scrollbar2.grid(column=0, row=3, sticky='nse')
+sentence_listbox.grid(column=0, row=1, sticky='news', padx=10)
+recommended_sentence_listbox_scrollbar.grid(column=0, row=1, sticky='nse')
+recommended_word_listbox.grid(column=0, row=3, sticky='news', padx=10)
+recommended_word_listbox_scrollbar.grid(column=0, row=3, sticky='nse')
 
 # Search bar
 search_bar = Frame(right_panel, relief=RAISED)
@@ -347,7 +360,7 @@ search_bar.columnconfigure(0, weight=1)
 
 search_label = Label(search_bar, text='Search word:')
 search_input = Text(search_bar, height=1)
-search_input.bind('<KeyRelease>', search_word)
+search_input.bind('<KeyRelease>', search_recommended_word)
 
 search_label.grid(column=0, row=0, sticky='se')
 search_input.grid(column=1, row=0, sticky='ws', padx=10, pady=5)
