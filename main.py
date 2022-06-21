@@ -22,7 +22,7 @@ bigram_path = pkg_resources.resource_filename('symspellpy', 'frequency_bigramdic
 sym_spell.load_dictionary(dictionary_path, term_index=0, count_index=1)
 sym_spell.load_bigram_dictionary(bigram_path, term_index=0, count_index=2)
 
-# current_sentence = ''
+current_sentence = ''
 
 # SAMPLE WRONG SENTENCES (COVERS MOST CASES)
 # current_sentence = 'let us wlak on the groun. it\'s weird that...'
@@ -36,7 +36,7 @@ sym_spell.load_bigram_dictionary(bigram_path, term_index=0, count_index=2)
 # current_sentence = 'GFG is a good compny and alays value ttheir employes.'
 # current_sentence = 'I amm goodd at spelling mstake.'
 # current_sentence = 'acress'
-current_sentence = 'two of thew'
+# current_sentence = 'two of thew'
 # current_sentence = 'i have an apply'
 # current_sentence = 'thequickbrownfoxjumpsoverthelazydog'
 
