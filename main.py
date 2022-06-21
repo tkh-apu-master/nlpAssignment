@@ -1,17 +1,13 @@
-import itertools
 from tkinter import *
 from tkinter.scrolledtext import ScrolledText
-import re
-import pkg_resources
-from collections import Counter
-from tkmacosx import Button
-from urllib.request import urlopen
 
+import pkg_resources
 from spellchecker import SpellChecker
 from symspellpy import SymSpell
 from textblob import TextBlob, Word
+from tkmacosx import Button
 
-from nltk.util import ngrams
+from real_word_custom_spell_check import *
 
 # Strategy: Use Norvig with SymSpell approach, which improves speed, memory consumption and accuracy
 # Reference: https://towardsdatascience.com/spelling-correction-how-to-make-an-accurate-and-fast-corrector-dc6d0bcbba5f
@@ -26,7 +22,7 @@ bigram_path = pkg_resources.resource_filename('symspellpy', 'frequency_bigramdic
 sym_spell.load_dictionary(dictionary_path, term_index=0, count_index=1)
 sym_spell.load_bigram_dictionary(bigram_path, term_index=0, count_index=2)
 
-current_sentence = ''
+# current_sentence = ''
 
 # SAMPLE WRONG SENTENCES (COVERS MOST CASES)
 # current_sentence = 'let us wlak on the groun. it\'s weird that...'
@@ -40,7 +36,7 @@ current_sentence = ''
 # current_sentence = 'GFG is a good compny and alays value ttheir employes.'
 # current_sentence = 'I amm goodd at spelling mstake.'
 # current_sentence = 'acress'
-# current_sentence = 'two of thew'
+current_sentence = 'two of thew'
 # current_sentence = 'i have an apply'
 # current_sentence = 'thequickbrownfoxjumpsoverthelazydog'
 
@@ -48,21 +44,6 @@ current_wrong_word = ''
 recommended_sentence_fixes = []
 recommended_word_fixes = []
 recommended_fixes_search_result = []
-global data
-
-
-# Load corpus in order for real-word spell correction
-def load_corpus_data():
-    global data
-    data = open('datasets/big.txt', encoding='utf-8').read()
-    data = data.replace('\n', ' ').replace('\t', ' ').replace('-', ' ').replace('—', ' ')
-    data = data.replace('_', '')
-    data = re.sub(r'[^\w\s]', '', data)
-    data = data.lower().strip().split(' ')
-    data = list(filter(None, data))
-
-
-load_corpus_data()
 
 root = Tk()
 root.title('NLP Demonstration: Spelling Correction')
@@ -93,15 +74,12 @@ def check_sentence(split_text):
     global current_sentence
     global recommended_sentence_fixes
 
-    # Check word segmentation with symspell
+    # Step 1: Check word segmentation with symspell
     word_segmentation_suggestions = sym_spell.word_segmentation(current_sentence)
-
-    if word_segmentation_suggestions[0].rstrip() == current_sentence:
-        return False
 
     if len(word_segmentation_suggestions) > 0:
         # Only takes the most recommended suggestion
-        add_sentence_suggestion(word_segmentation_suggestions[0].rstrip())
+        add_sentence_suggestion(word_segmentation_suggestions[0])
 
     # If you got a sentence that has issue with word segmentation, and there's recommended fix. stop here
     # Return True to prevent further unnecessary checks
@@ -109,25 +87,27 @@ def check_sentence(split_text):
         show_recommended_sentence()
         return True
 
-    # Check if the sentence is correct with TextBlob
+    # Step 2: Check if the sentence is correct with TextBlob
     textblob_sentence = TextBlob(current_sentence)
     corrected_sentence = textblob_sentence.correct()
     # Need to convert TextBlob object to string with filtered out '\n' first
-    textblob_fixed_sentence = str(corrected_sentence)[:-1].rstrip()
-
-    # if textblob_fixed_sentence == current_sentence:
-    #     return False
+    textblob_fixed_sentence = str(corrected_sentence)[:-1]
 
     add_sentence_suggestion(textblob_fixed_sentence)
 
-    # Real word sentence suggestions (Resource intensive)
-    # possible_sentence_combinations = closest_all_sent(current_sentence)
-    possible_sentence_combinations2 = closest_sent(current_sentence)
+    # Step 3: Real word sentence suggestions (Resource intensive)
+    # Only allows numbers and characters
+    if len(split_text) <= 6:
+        possible_sentence_combinations = closest_all_sent(current_sentence)
+        possible_sentence_combinations2 = closest_sent(current_sentence)
+    else:
+        possible_sentence_combinations = []
+        possible_sentence_combinations2 = []
 
-    # for sentence in possible_sentence_combinations:
-    #     add_sentence_suggestion(sentence.rstrip())
+    for sentence in possible_sentence_combinations:
+        add_sentence_suggestion(sentence)
     for sentence in possible_sentence_combinations2:
-        add_sentence_suggestion(sentence.rstrip())
+        add_sentence_suggestion(sentence)
 
     if len(recommended_sentence_fixes) > 0:
         show_recommended_sentence()
@@ -136,18 +116,23 @@ def check_sentence(split_text):
         return False
 
 
+# Helper function to add a sentence suggestion to the list of recommended fixes
+# with standardized formatting and validations.
 def add_sentence_suggestion(corrected_sentence):
     global recommended_sentence_fixes
 
-    if corrected_sentence != current_sentence and \
+    if str(corrected_sentence).strip() != current_sentence.strip() and \
             corrected_sentence not in recommended_sentence_fixes:
-        recommended_sentence_fixes.append(corrected_sentence)
+        recommended_sentence_fixes.append(str(corrected_sentence).strip())
 
 
+# Perform word by word analysis
 def analyze_text(split_text):
     global current_sentence
     global current_wrong_word
     global recommended_word_fixes
+
+    # Step 1: Check word spelling with symspell
     misspelled = spell.unknown(split_text)
 
     if len(misspelled) > 0:
@@ -157,40 +142,46 @@ def analyze_text(split_text):
         display_recommended_word_fixes()
 
 
+# Display the recommended fixes in the GUI
 def show_recommended_sentence():
-    mistake_sentence_label.config(text='Possible word segmentation/real word mistake.'
-                                       ' Please click one of the following suggestions:')
+    mistake_sentence_label.config(text='Sentence suggestions:')
     display_recommended_sentence_fixes()
 
 
+# Clear the user input at the left panel
 def clear_input():
     user_input_textbox.delete(1.0, 'end')
     user_input_textbox.focus_set()
 
 
+# Event handler for the sentence recommendation in list box
 def on_sentence_select(event):
     selected_item = sentence_listbox.get(ANCHOR)
     correct_misspelled_sentence(selected_item)
-    analyze_sentence()  # Analyze again
+    clear_recommended_fixes()
+    # analyze_sentence()  # Analyze again
 
 
+# Event handler for the word recommendation in list box
 def on_correct_word_select(event):
     selected_item = recommended_word_listbox.get(ANCHOR)
     correct_misspelled_word(selected_item)
     analyze_word()  # Analyze again
 
 
+# Clear user input and recommended fixes
 def clear():
     clear_input()
     clear_recommended_fixes()
 
 
+# Helper function to clear the recommended fixes in the GUI (labels and list boxes)
 def clear_recommended_fixes():
     global recommended_fixes_search_result
     global recommended_sentence_fixes
     recommended_fixes_search_result.clear()
     recommended_sentence_fixes.clear()
-    misspelled_word_label.config(text='Misspelled sentence: None')
+    mistake_sentence_label.config(text='Misspelled sentence: None')
     misspelled_word_label.config(text='Misspelled word: None')
     sentence_listbox.delete(0, END)
     sentence_listbox.unbind('<Double-1>')
@@ -199,25 +190,30 @@ def clear_recommended_fixes():
 
 
 def get_recommended_word_fixes(wrong_word):
-    # Get suggestions from SymSpell
+    # Step 1: Get suggestions from SymSpell
     candidates = spell.candidates(wrong_word)
     if candidates is not None:
         suggested_words = list(candidates)
     else:
         suggested_words = []
 
-    # Additionally, use SymSpell to find similar words
+    # Step 2: use SymSpell to find similar words
     symspell_suggestions = sym_spell.lookup_compound(wrong_word, max_edit_distance=2)
     for suggestion in symspell_suggestions:
         if str(suggestion.term).rstrip() not in suggested_words and str(suggestion.term).rstrip() != wrong_word:
             suggested_words.append(str(suggestion.term).rstrip())
 
-    # Use TextBlob to find similar words
+    # Step 3: Use TextBlob to find similar words
     w = Word(wrong_word)
     textblob_word_suggestions = w.spellcheck()
     for similar_word in textblob_word_suggestions:
         if str(similar_word[0]).rstrip() not in suggested_words and str(similar_word[0]).rstrip() != wrong_word.lower():
             suggested_words.append(str(similar_word[0]).rstrip())
+
+    # Step 4: Use custom functions to find similar words
+    closest_word_result = closest_word(wrong_word)
+    if closest_word_result not in suggested_words and closest_word_result != wrong_word.lower():
+        suggested_words.append(closest_word_result)
 
     return suggested_words
 
@@ -254,6 +250,7 @@ def correct_misspelled_sentence(corrected_sentence):
 
 
 def search_recommended_word(event):
+    global recommended_word_fixes
     global recommended_fixes_search_result
     recommended_word_listbox.delete(0, END)
     recommended_word_listbox.unbind('<Double-1>')
@@ -261,7 +258,7 @@ def search_recommended_word(event):
     search_keyword = search_input.get(1.0, 'end')
 
     for i in range(len(recommended_word_fixes)):
-        if search_keyword in recommended_word_fixes[i]:
+        if search_keyword.strip() in str(recommended_word_fixes[i]):
             recommended_fixes_search_result.append(recommended_word_fixes[i])
 
     # If search_keyword is empty, show all recommended words as default
@@ -275,21 +272,6 @@ def search_recommended_word(event):
 
 # A function that analyze the accuracy of the spell checker, with using misspelling corpora, and display the results.
 def spelling_corrector_analysis():
-    # Prepare dataset
-    r = urlopen('https://www.dcs.bbk.ac.uk/~ROGER/missp.dat')
-    correct_words = []
-    wrong_words = []
-
-    for line in r:
-        string = str(line)
-        string = string[2:]  # Remove b'
-        string = string[:-3]  # Remove \n'
-        if '_' not in string:
-            if string.startswith(tuple(['$'])):
-                correct_words.append(string)
-            else:
-                wrong_words.append(string)
-
     # Analyze accuracy
     test_data = wrong_words[:50]
     correct_count = 0
@@ -311,138 +293,9 @@ def spelling_corrector_analysis():
     print('accuracy: ', accuracy, '%')
 
 
-# Reference: https://medium.com/analytics-vidhya/real-word-spell-correction-c64a3a02c64d
-corpus_words = Counter(data)
+def close():
+    root.destroy()
 
-
-def p(word, n=sum(corpus_words.values())):
-    # Returns probability of a word in vocabulary.
-    return corpus_words[word] / n
-
-
-def edit_distance(str1, str2, m, n):
-    dp = [[0 for _ in range(n + 1)] for _ in range(m + 1)]
-
-    for i in range(m + 1):
-        for j in range(n + 1):
-            if i == 0:
-                dp[i][j] = j
-
-            elif j == 0:
-                dp[i][j] = i
-
-            elif str1[i - 1] == str2[j - 1]:
-                dp[i][j] = dp[i - 1][j - 1]
-
-            else:
-                dp[i][j] = min(dp[i][j - 1] + 1,  # Insert
-                               dp[i - 1][j] + 1,  # Remove
-                               dp[i - 1][j - 1] + 1)  # Replace
-
-    return dp[m][n]
-
-
-def word_candidates(word):
-    # Returns the words that are edit distance 0,1 or 2 away from the given word. Inspired from Peter Norvig
-    ed_0 = set()
-    ed_1 = set()
-    ed_2 = set()
-    for w in corpus_words:
-        ed = edit_distance(word, w, len(word), len(w))
-        if ed > 2:
-            continue
-        elif ed == 0:
-            ed_0.add(w)
-        elif ed == 1:
-            ed_1.add(w)
-        elif ed == 2:
-            ed_2.add(w)
-    return [ed_0, ed_1, ed_2, {word}]
-
-
-def closest_word(word):
-    # Chooses the closest word according to their frequency. Highest priority given to words with the least edit
-    # distance.
-    for i in word_candidates(word):
-        if i:
-            return max(i, key=p)
-
-
-bigrams = Counter(ngrams(data, 2))
-
-
-def bigram_prob(sent):
-    out = p(sent[0])
-    for i in range(1, len(sent)):
-        out *= bigrams[(sent[i - 1], sent[i])] / corpus_words[sent[i - 1]]
-    return out
-
-
-def sent_all_candidates(sent):
-    candidates = []
-    sent = sent.split()
-    word_present = [s in corpus_words for s in sent]
-    if all(word_present):
-        for i in sent:
-            wc = word_candidates(i)[1]
-            wc.add(i)
-            candidates.append(list(wc))
-        candidates = list(itertools.product(*candidates))
-    else:
-        idx = word_present.index(0)
-        selected_words = word_candidates(sent[idx])[1]
-        for i in selected_words:
-            l = sent.copy()
-            l[idx] = i
-            candidates.append(l)
-    return candidates
-
-
-def sent_candidates(sent):
-    cands = []
-    sent = sent.split()
-    word_present = [s in corpus_words for s in sent]
-    if all(word_present):
-        cands.append(sent)
-        for i in range(len(sent)):
-            words = word_candidates(sent[i])[1]
-            for j in words:
-                l = sent.copy()
-                l[i] = j
-                cands.append(l)
-    else:
-        idx = word_present.index(0)
-        words = word_candidates(sent[idx])[1]
-        for i in words:
-            l = sent.copy()
-            l[idx] = i
-            cands.append(l)
-    return cands
-
-
-def closest_all_sent(sent):
-    results = []
-    for i in sent_all_candidates(sent):
-        if bigram_prob(i) > 0:
-            # print(i, ' Probability = ', bigram_prob(i))
-            results.append(' '.join(i))
-    # return ' '.join(max(sent_candidates(sent), key=bigram_prob))
-    return results
-
-
-def closest_sent(sent):
-    results = []
-    for i in sent_candidates(sent):
-        if bigram_prob(i) > 0:
-            # print(i, ' Probability = ', bigram_prob(i))
-            results.append(' '.join(i))
-    # return ' '.join(max(sent_candidates(sent), key=bigram_prob))
-    return results
-
-
-# closest_word('acress')
-# closest_all_sent('two of thew')
-# closest_sent('i have an apply')
 
 # Left panel
 left_panel = Frame(root)
@@ -462,12 +315,12 @@ btn_word_submit = Button(frm_buttons, text='Word Check', command=analyze_word, b
 btn_sentence_submit = Button(frm_buttons, text='Sentence Check', command=analyze_sentence, background='#00CA4E',
                              foreground='black')
 btn_clear = Button(frm_buttons, text='Clear', command=clear, background='#FFBD44', foreground='black')
-btn_exit = Button(frm_buttons, text='Exit', command=root.destroy, background='#FF605C', foreground='black')
+btn_exit = Button(frm_buttons, text='Exit', command=close, background='#FF605C', foreground='black')
 btn_spelling_corrector_analysis.grid(column=0, row=0, sticky='nsew')
-btn_word_submit.grid(column=0, row=1, sticky='e')
-btn_sentence_submit.grid(column=0, row=1, sticky='w')
-btn_clear.grid(column=0, row=2, sticky='nsew')
-btn_exit.grid(column=0, row=3, sticky='nsew')
+btn_sentence_submit.grid(column=0, row=1, sticky='nsew')
+btn_word_submit.grid(column=0, row=2, sticky='nsew')
+btn_clear.grid(column=0, row=3, sticky='nsew')
+btn_exit.grid(column=0, row=4, sticky='nsew')
 
 # User input
 user_input = Frame(left_panel, relief=RAISED)
@@ -491,7 +344,7 @@ right_panel.columnconfigure(0, weight=1)
 
 # Listboxes with scrollbars
 mistake_sentence_label = Label(right_panel, text='Misspelled sentence: None')
-misspelled_word_label = Label(right_panel, text='Misspelled word:')
+misspelled_word_label = Label(right_panel, text='Misspelled word: None')
 recommended_sentence_listbox_scrollbar = Scrollbar(right_panel, orient='vertical')
 sentence_listbox = Listbox(right_panel, activestyle='dotbox', yscrollcommand=recommended_sentence_listbox_scrollbar.set)
 recommended_word_listbox_scrollbar = Scrollbar(right_panel, orient='vertical')
