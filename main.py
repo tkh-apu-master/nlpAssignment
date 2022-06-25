@@ -1,6 +1,7 @@
 from tkinter import *
 from tkinter.scrolledtext import ScrolledText
 
+import nltk
 import pkg_resources
 from spellchecker import SpellChecker
 from symspellpy import SymSpell
@@ -12,7 +13,8 @@ from real_word_custom_spell_check import *
 # Strategy: Use Norvig with SymSpell approach, which improves speed, memory consumption and accuracy
 # Reference: https://towardsdatascience.com/spelling-correction-how-to-make-an-accurate-and-fast-corrector-dc6d0bcbba5f
 
-spell = SpellChecker()
+spell = SpellChecker(case_sensitive=True)
+spell.word_frequency.load_text_file('datasets/correct_words.txt')
 
 sym_spell = SymSpell(max_dictionary_edit_distance=2, prefix_length=7)
 
@@ -39,6 +41,7 @@ current_sentence = ''
 # current_sentence = 'two of thew'
 # current_sentence = 'i have an apply'
 # current_sentence = 'thequickbrownfoxjumpsoverthelazydog'
+# current_sentence = 'thequickbrownfoxjumpsoverthelaszydog'
 
 current_wrong_word = ''
 recommended_sentence_fixes = []
@@ -51,28 +54,37 @@ root.rowconfigure(0, weight=1)
 root.columnconfigure(1, weight=1)
 
 
-def analyze(function):
-    global current_sentence
-    current_sentence = user_input_textbox.get('1.0', END)
-    clear_recommended_fixes()
-    # Split sentence into words precisely using regex: https://stackoverflow.com/a/26209841
-    split_text = re.findall(r"(?<![@#])\b\w+(?:'\w+)?", current_sentence)
-    function(split_text)
-    user_input_textbox.focus_set()
+def analyze(word=None):
+    if word:
+        split_text = [word]
+        clear_recommended_fixes()
+        need_fix = analyze_text(split_text)
+    else:
+        global current_sentence
+        clear_recommended_fixes()
+        current_sentence = user_input_textbox.get('1.0', END)
+        # Split sentence into words precisely using regex: https://stackoverflow.com/a/26209841
+        split_text = re.findall(r"(?<![@#])\b\w+(?:'\w+)?", current_sentence)
+        need_fix = check_sentence_segmentation(split_text)
+        if need_fix:
+            display_recommended_sentence_fixes()
+        else:
+            need_fix = analyze_text(split_text)
 
+            if need_fix:
+                display_recommended_word_fixes()
 
-def analyze_sentence():
-    analyze(check_sentence)
+        user_input_textbox.focus_set()
 
-
-def analyze_word():
-    analyze(analyze_text)
+    return need_fix
 
 
 # Analyze the sentence and suggest correct word segmentation & grammar
-def check_sentence(split_text):
+def check_sentence_segmentation(split_text):
     global current_sentence
     global recommended_sentence_fixes
+    global recommended_word_fixes
+    global current_wrong_word
 
     # Step 1: Check word segmentation with symspell
     word_segmentation_suggestions = sym_spell.word_segmentation(current_sentence)
@@ -84,36 +96,45 @@ def check_sentence(split_text):
     # If you got a sentence that has issue with word segmentation, and there's recommended fix. stop here
     # Return True to prevent further unnecessary checks
     if len(split_text) == 1 and len(recommended_sentence_fixes) == 1:
-        show_recommended_sentence()
         return True
 
-    # Step 2: Check if the sentence is correct with TextBlob
-    textblob_sentence = TextBlob(current_sentence)
-    corrected_sentence = textblob_sentence.correct()
-    # Need to convert TextBlob object to string with filtered out '\n' first
-    textblob_fixed_sentence = str(corrected_sentence)[:-1]
+    # # Step 2: Check if the sentence is correct with TextBlob
+    # textblob_sentence = TextBlob(current_sentence)
+    # corrected_sentence = textblob_sentence.correct()
+    #
+    # # Need to convert TextBlob object to string with filtered out '\n' first
+    # textblob_fixed_sentence = str(corrected_sentence)[:-1]
+    #
+    # corrected_sentence_split_words = nltk.word_tokenize(textblob_fixed_sentence)
+    # for index in range(len(split_text)):
+    #     # Only take one mistake word
+    #
+    #     word_suggestion = corrected_sentence_split_words[index]
+    #     if split_text[index] != word_suggestion and word_suggestion not in recommended_word_fixes:
+    #         current_wrong_word = split_text[index]
+    #         recommended_word_fixes.append(str(corrected_sentence_split_words[index]).rstrip())
 
-    add_sentence_suggestion(textblob_fixed_sentence)
+    # add_sentence_suggestion(textblob_fixed_sentence)
 
-    # Step 3: Real-word sentence suggestions (Resource intensive)
-    # Only allows numbers and characters
-    if len(split_text) <= 6:
-        possible_sentence_combinations = closest_all_sent(current_sentence)
-        possible_sentence_combinations2 = closest_sent(current_sentence)
-    else:
-        possible_sentence_combinations = []
-        possible_sentence_combinations2 = []
-
-    for sentence in possible_sentence_combinations:
-        add_sentence_suggestion(sentence)
-    for sentence in possible_sentence_combinations2:
-        add_sentence_suggestion(sentence)
+    # # Step 3: Real-word sentence suggestions (Resource intensive)
+    # # Only allows numbers and characters
+    # if len(split_text) <= 6:
+    #     possible_sentence_combinations = closest_all_sent(current_sentence)
+    #     possible_sentence_combinations2 = closest_sent(current_sentence)
+    # else:
+    #     possible_sentence_combinations = []
+    #     possible_sentence_combinations2 = []
+    #
+    # for sentence in possible_sentence_combinations:
+    #     add_sentence_suggestion(sentence)
+    # for sentence in possible_sentence_combinations2:
+    #     add_sentence_suggestion(sentence)
 
     if len(recommended_sentence_fixes) > 0:
-        show_recommended_sentence()
+        mistake_sentence_label.config(text='Sentence suggestions:')
         return True
-    else:
-        return False
+
+    return False
 
 
 # Helper function to add a sentence suggestion to the list of recommended fixes
@@ -134,18 +155,88 @@ def analyze_text(split_text):
 
     # Step 1: Check word spelling with symspell
     misspelled = spell.unknown(split_text)
-
     if len(misspelled) > 0:
-        current_wrong_word = list(misspelled)[0]
-        misspelled_word_label.config(text='Misspelled word: ' + current_wrong_word)
-        recommended_word_fixes = get_recommended_word_fixes(current_wrong_word)
-        display_recommended_word_fixes()
+        for index in range(len(split_text)):
+            full_uppercase = re.findall('[A-Z]', split_text[index])
+            is_full_uppercase = len(full_uppercase) == len(split_text[index])
 
+            # A word that is Fully uppercase and recognized as misspelled
+            if str(split_text[index]).lower() in list(misspelled) and not is_full_uppercase:
+                current_wrong_word = split_text[index]
+                candidates = spell.candidates(current_wrong_word)
 
-# Display the recommended fixes in the GUI
-def show_recommended_sentence():
-    mistake_sentence_label.config(text='Sentence suggestions:')
-    display_recommended_sentence_fixes()
+                if candidates is not None:
+                    candidates = list(candidates)
+                    candidates.sort()
+                    recommended_word_fixes = candidates
+                else:
+                    recommended_word_fixes = []
+                break
+            else:
+                recommended_word_fixes = []
+
+    if len(recommended_word_fixes) > 0:
+        return True
+
+    # Step 2: use SymSpell to find similar words
+    symspell_suggestions = sym_spell.lookup_compound(current_sentence, max_edit_distance=2, transfer_casing=True,
+                                                     ignore_non_words=True)
+
+    # symspell_suggestions variable has the following format (suggestion term, edit distance, term frequency)
+    split_text2 = re.findall(r"(?<![@#])\b\w+(?:'\w+)?", symspell_suggestions[0].term)
+
+    if len(split_text2) > 0:
+        for index in range(len(split_text)):
+            current_sentence_word = split_text[index]
+            suggested_sentence_word = split_text2[index]
+            if current_sentence_word != suggested_sentence_word and suggested_sentence_word not in recommended_word_fixes:
+                current_wrong_word = split_text[index]
+                recommended_word_fixes.append(split_text2[index])
+                break
+
+    if len(recommended_word_fixes) > 0:
+        return True
+
+    # Step 3: Use TextBlob to find similar words
+    for index in range(len(split_text)):
+        current_sentence_word = split_text[index]
+
+        w = Word(split_text[index])
+        textblob_word_suggestions = w.spellcheck()
+        for similar_word in textblob_word_suggestions:
+            suggested_sentence_word = str(similar_word[0]).rstrip()
+            if suggested_sentence_word not in recommended_word_fixes and \
+                    suggested_sentence_word != current_sentence_word:
+                current_wrong_word = current_sentence_word
+                recommended_word_fixes.append(suggested_sentence_word)
+                break
+
+    if len(recommended_word_fixes) > 0:
+        return True
+
+    # Step 4: Check if the sentence is correct with TextBlob
+    textblob_sentence = TextBlob(current_sentence)
+    corrected_sentence = textblob_sentence.correct()
+
+    # Need to convert TextBlob object to string with filtered out '\n' first
+    textblob_fixed_sentence = str(corrected_sentence)[:-1]
+
+    corrected_sentence_split_words = nltk.word_tokenize(textblob_fixed_sentence)
+
+    if len(corrected_sentence_split_words) > 0:
+        for index in range(len(split_text)):
+            # Only take one mistake word
+
+            word_suggestion = corrected_sentence_split_words[index]
+            if split_text[index] != word_suggestion and word_suggestion not in recommended_word_fixes:
+                current_wrong_word = split_text[index]
+                recommended_word_fixes.append(str(corrected_sentence_split_words[index]).rstrip())
+                break
+
+    if len(recommended_word_fixes) > 0:
+        return True
+
+    return False
 
 
 # Clear the user input at the left panel
@@ -159,14 +250,14 @@ def on_sentence_select(event):
     selected_item = sentence_listbox.get(ANCHOR)
     correct_misspelled_sentence(selected_item)
     clear_recommended_fixes()
-    # analyze_sentence()  # Analyze again
+    analyze()  # Analyze again
 
 
 # Event handler for the word recommendation in list box
 def on_correct_word_select(event):
     selected_item = recommended_word_listbox.get(ANCHOR)
     correct_misspelled_word(selected_item)
-    analyze_word()  # Analyze again
+    analyze()  # Analyze again
 
 
 # Clear user input and recommended fixes
@@ -179,8 +270,14 @@ def clear():
 def clear_recommended_fixes():
     global recommended_fixes_search_result
     global recommended_sentence_fixes
+    global recommended_word_fixes
+    global current_wrong_word
+    global current_sentence
+    current_wrong_word = ''
+    current_sentence = ''
     recommended_fixes_search_result.clear()
     recommended_sentence_fixes.clear()
+    recommended_word_fixes.clear()
     mistake_sentence_label.config(text='Misspelled sentence: None')
     misspelled_word_label.config(text='Misspelled word: None')
     sentence_listbox.delete(0, END)
@@ -190,32 +287,15 @@ def clear_recommended_fixes():
 
 
 def get_recommended_word_fixes(wrong_word):
-    # Step 1: Get suggestions from SymSpell
-    candidates = spell.candidates(wrong_word)
-    if candidates is not None:
-        suggested_words = list(candidates)
-    else:
-        suggested_words = []
-
-    # Step 2: use SymSpell to find similar words
-    symspell_suggestions = sym_spell.lookup_compound(wrong_word, max_edit_distance=2)
-    for suggestion in symspell_suggestions:
-        if str(suggestion.term).rstrip() not in suggested_words and str(suggestion.term).rstrip() != wrong_word:
-            suggested_words.append(str(suggestion.term).rstrip())
-
-    # Step 3: Use TextBlob to find similar words
-    w = Word(wrong_word)
-    textblob_word_suggestions = w.spellcheck()
-    for similar_word in textblob_word_suggestions:
-        if str(similar_word[0]).rstrip() not in suggested_words and str(similar_word[0]).rstrip() != wrong_word.lower():
-            suggested_words.append(str(similar_word[0]).rstrip())
-
+    global current_wrong_word
+    global recommended_word_fixes
     # Step 4: Use custom functions to find similar words
     closest_word_result = closest_word(wrong_word)
-    if closest_word_result not in suggested_words and closest_word_result != wrong_word.lower():
-        suggested_words.append(closest_word_result)
+    if closest_word_result not in recommended_word_fixes and closest_word_result != wrong_word.lower():
+        current_wrong_word = wrong_word
+        recommended_word_fixes.append(closest_word_result)
 
-    return suggested_words
+    return recommended_word_fixes
 
 
 def display_recommended_sentence_fixes():
@@ -227,6 +307,8 @@ def display_recommended_sentence_fixes():
 
 def display_recommended_word_fixes():
     global recommended_word_fixes
+    global current_wrong_word
+    misspelled_word_label.config(text='Misspelled word: ' + current_wrong_word)
     for word in recommended_word_fixes:
         recommended_word_listbox.insert(END, word)
     recommended_word_listbox.bind('<Double-1>', on_correct_word_select)
@@ -273,24 +355,43 @@ def search_recommended_word(event):
 # A function that analyze the accuracy of the spell checker, with using misspelling corpora, and display the results.
 def spelling_corrector_analysis():
     # Analyze accuracy
-    test_data = wrong_words[:50]
     correct_count = 0
     wrong_count = 0
-    for mispelled_word in test_data:
-        suggestions = get_recommended_word_fixes(mispelled_word)
-        # print(mispelled_word, ' suggestions: ', suggestions)
+    TP = 0
+    TN = 0
+    FP = 0
+    FN = 0
+    counter = 0
+    for (word, is_correct) in word_set:
+        print('counter: ', counter)
+        need_fix = analyze(word)
 
-        # If there is no suggestion, then the word is not in the dictionary
-        if suggestions is not None and len(suggestions) > 0:
-            correct_count += 1
+        if need_fix is True:
+            if is_correct is True:
+                wrong_count += 1
+                FP += 1
+            else:
+                correct_count += 1
+                TP += 1
         else:
-            wrong_count += 1
+            if is_correct is True:
+                correct_count += 1
+                TN += 1
+            else:
+                wrong_count += 1
+                FN += 1
+        counter += 1
 
-    # Display results, if there is no suggestion, then the word is not in the dictionary, means not good enough
-    print('length of test_data: ', len(test_data))
+    print('length of word_set: ', len(word_set))
     print('correct_count: ', correct_count)
-    accuracy = correct_count / len(test_data) * 100
-    print('accuracy: ', accuracy, '%')
+    accuracy = correct_count / len(word_set)
+    precision = TP / (TP + FP)
+    recall = TP / (TP + FN)
+    f1 = 2 * precision * recall / (precision + recall)
+    print('accuracy: ', accuracy * 100, '%')
+    print('precision: ', precision * 100, '%')
+    print('recall: ', recall, '%')
+    print('f1: ', f1)
 
 
 def close():
@@ -311,16 +412,14 @@ frm_buttons.grid(column=0, row=1, sticky='nsew')
 
 btn_spelling_corrector_analysis = Button(frm_buttons, text='Spelling Corrector Accuracy Analysis',
                                          command=spelling_corrector_analysis, background='grey')
-btn_word_submit = Button(frm_buttons, text='Word Check', command=analyze_word, background='#00CA4E', foreground='black')
-btn_sentence_submit = Button(frm_buttons, text='Sentence Check', command=analyze_sentence, background='#00CA4E',
+btn_sentence_submit = Button(frm_buttons, text='Submit', command=analyze, background='#00CA4E',
                              foreground='black')
 btn_clear = Button(frm_buttons, text='Clear', command=clear, background='#FFBD44', foreground='black')
 btn_exit = Button(frm_buttons, text='Exit', command=close, background='#FF605C', foreground='black')
 btn_spelling_corrector_analysis.grid(column=0, row=0, sticky='nsew')
 btn_sentence_submit.grid(column=0, row=1, sticky='nsew')
-btn_word_submit.grid(column=0, row=2, sticky='nsew')
-btn_clear.grid(column=0, row=3, sticky='nsew')
-btn_exit.grid(column=0, row=4, sticky='nsew')
+btn_clear.grid(column=0, row=2, sticky='nsew')
+btn_exit.grid(column=0, row=3, sticky='nsew')
 
 # User input
 user_input = Frame(left_panel, relief=RAISED)

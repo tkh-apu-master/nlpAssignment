@@ -29,8 +29,7 @@
   * cd pyspellchecker
   * python setup.py install
 * python -m pip install -U symspellpy
-* pip install --upgrade 3to2
-* pip install --upgrade language-check
+
 
 ## Common problem:
 * SSL certificate error (urllib.error.URLError: <urlopen error [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: unable to get local issuer certificate)
