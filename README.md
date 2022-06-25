@@ -2,13 +2,15 @@
 
 ## Main libraries used:
 * [PySpellChecker](https://github.com/barrust/pyspellchecker)
-* [SymSpell]()
+* [SymSpell](https://github.com/wolfgarbe/symspell)
+* [editdistpy](https://github.com/mammothb/editdistpy)
+* [TextBlob](https://textblob.readthedocs.io/en/dev/)
+* [NLTK N-gram](https://www.geeksforgeeks.org/n-gram-language-modelling-with-nltk/)
 
 ## Primary techniques used:
 * Peter Norvig's [Levenshtein Distance](https://en.wikipedia.org/wiki/Levenshtein_distance) algorithm
-* Frequency Distribution
+* [Frequency Distribution](https://gist.github.com/amitrani6/7f85394e7ccbec14f51968d5ac129dd7)
 * [N-Gram](https://en.wikipedia.org/wiki/N-gram)
-* 
 
 # Quick Guide
 
@@ -21,10 +23,11 @@
 
 * pip install tkmacosx (for mac)
 * pip install textblob
-* pip install pyspellchecker (DONt use this command)
-* git clone https://github.com/barrust/pyspellchecker.git
-* cd pyspellchecker
-* python setup.py install
+* ~~pip install pyspellchecker~~ (Outdated)
+* pyspellchecker
+  * git clone https://github.com/barrust/pyspellchecker.git
+  * cd pyspellchecker
+  * python setup.py install
 * python -m pip install -U symspellpy
 * pip install --upgrade 3to2
 * pip install --upgrade language-check

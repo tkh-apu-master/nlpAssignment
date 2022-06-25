@@ -95,7 +95,7 @@ def check_sentence(split_text):
 
     add_sentence_suggestion(textblob_fixed_sentence)
 
-    # Step 3: Real word sentence suggestions (Resource intensive)
+    # Step 3: Real-word sentence suggestions (Resource intensive)
     # Only allows numbers and characters
     if len(split_text) <= 6:
         possible_sentence_combinations = closest_all_sent(current_sentence)
