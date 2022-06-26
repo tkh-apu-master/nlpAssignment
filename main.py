@@ -68,11 +68,13 @@ def analyze(word=None):
         need_fix = check_sentence_segmentation(split_text)
         if need_fix:
             display_recommended_sentence_fixes()
+            if split_text == 1:
+                need_fix = analyze_text(split_text)
         else:
             need_fix = analyze_text(split_text)
 
-            if need_fix:
-                display_recommended_word_fixes()
+        if need_fix:
+            display_recommended_word_fixes()
 
         user_input_textbox.focus_set()
 
@@ -163,12 +165,14 @@ def analyze_text(split_text):
             # A word that is Fully uppercase and recognized as misspelled
             if str(split_text[index]).lower() in list(misspelled) and not is_full_uppercase:
                 current_wrong_word = split_text[index]
+                print('step 1 current_wrong_word:', current_wrong_word)
                 candidates = spell.candidates(current_wrong_word)
 
                 if candidates is not None:
                     candidates = list(candidates)
                     candidates.sort()
-                    recommended_word_fixes = candidates
+                    print('step 1 candidates:', candidates)
+                    recommended_word_fixes.append(candidates)
                 else:
                     recommended_word_fixes = []
                 break
@@ -189,6 +193,11 @@ def analyze_text(split_text):
         for index in range(len(split_text)):
             current_sentence_word = split_text[index]
             suggested_sentence_word = split_text2[index]
+
+            if suggested_sentence_word != current_sentence_word:
+                print('step 2 current_sentence_word:', current_sentence_word)
+                print('step 2 suggested_sentence_word:', suggested_sentence_word)
+
             if current_sentence_word != suggested_sentence_word and suggested_sentence_word not in recommended_word_fixes:
                 current_wrong_word = split_text[index]
                 recommended_word_fixes.append(split_text2[index])
@@ -205,6 +214,11 @@ def analyze_text(split_text):
         textblob_word_suggestions = w.spellcheck()
         for similar_word in textblob_word_suggestions:
             suggested_sentence_word = str(similar_word[0]).rstrip()
+
+            if suggested_sentence_word != current_sentence_word:
+                print('step 3 current_sentence_word:', current_sentence_word)
+                print('step 3 suggested_sentence_word:', suggested_sentence_word)
+
             if suggested_sentence_word not in recommended_word_fixes and \
                     suggested_sentence_word != current_sentence_word:
                 current_wrong_word = current_sentence_word
@@ -365,6 +379,7 @@ def spelling_corrector_analysis():
     for (word, is_correct) in word_set:
         print('counter: ', counter)
         need_fix = analyze(word)
+        print('recommended_word_fixes: ', recommended_word_fixes)
 
         if need_fix is True:
             if is_correct is True:

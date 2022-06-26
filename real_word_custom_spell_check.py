@@ -219,6 +219,8 @@ def initialize():
         save_correct_words()
         save_wrong_words()
 
+    random.shuffle(correct_words)
+    random.shuffle(wrong_words)
     correct_word_set = [(word, True) for word in correct_words[:100]]
     wrong_word_set = [(word, False) for word in wrong_words[:100]]
     word_set = correct_word_set + wrong_word_set
