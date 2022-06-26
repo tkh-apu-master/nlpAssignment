@@ -24,10 +24,10 @@ bigram_path = pkg_resources.resource_filename('symspellpy', 'frequency_bigramdic
 sym_spell.load_dictionary(dictionary_path, term_index=0, count_index=1)
 sym_spell.load_bigram_dictionary(bigram_path, term_index=0, count_index=2)
 
-current_sentence = ''
+# current_sentence = ''
 
 # SAMPLE WRONG SENTENCES (COVERS MOST CASES)
-# current_sentence = 'let us wlak on the groun. it\'s weird that...'
+current_sentence = 'let us wlak on the groun.'
 # current_sentence = 'It is a truth unіversally acknowledged, that a single man in possesssion of a good fortune must be' \
 #                    ' in want of a wife. However little known the feelings or views of such a man may be on his first' \
 #                    ' entering a neighbourhood, this truth is so well fixed in the minds of the surrounding families,' \
@@ -157,6 +157,8 @@ def analyze_text(split_text):
 
     # Step 1: Check word spelling with symspell
     misspelled = spell.unknown(split_text)
+    correct_word_list = spell.known(split_text)
+    print('correct_word_list: ' , correct_word_list)
     if len(misspelled) > 0:
         for index in range(len(split_text)):
             full_uppercase = re.findall('[A-Z]', split_text[index])
@@ -194,7 +196,7 @@ def analyze_text(split_text):
             current_sentence_word = split_text[index]
             suggested_sentence_word = split_text2[index]
 
-            if suggested_sentence_word != current_sentence_word:
+            if suggested_sentence_word != current_sentence_word and str(current_sentence_word).lower() not in list(correct_word_list):
                 print('step 2 current_sentence_word:', current_sentence_word)
                 print('step 2 suggested_sentence_word:', suggested_sentence_word)
 
@@ -213,6 +215,7 @@ def analyze_text(split_text):
         w = Word(split_text[index])
         textblob_word_suggestions = w.spellcheck()
         for similar_word in textblob_word_suggestions:
+            print('similar_word: ', similar_word)
             suggested_sentence_word = str(similar_word[0]).rstrip()
 
             if suggested_sentence_word != current_sentence_word:
@@ -220,7 +223,8 @@ def analyze_text(split_text):
                 print('step 3 suggested_sentence_word:', suggested_sentence_word)
 
             if suggested_sentence_word not in recommended_word_fixes and \
-                    suggested_sentence_word != current_sentence_word:
+                    suggested_sentence_word != current_sentence_word and \
+                    str(current_sentence_word).lower() not in list(correct_word_list):
                 current_wrong_word = current_sentence_word
                 recommended_word_fixes.append(suggested_sentence_word)
                 break
@@ -231,6 +235,7 @@ def analyze_text(split_text):
     # Step 4: Check if the sentence is correct with TextBlob
     textblob_sentence = TextBlob(current_sentence)
     corrected_sentence = textblob_sentence.correct()
+    print('step 4 corrected_sentence:', corrected_sentence)
 
     # Need to convert TextBlob object to string with filtered out '\n' first
     textblob_fixed_sentence = str(corrected_sentence)[:-1]
@@ -239,10 +244,10 @@ def analyze_text(split_text):
 
     if len(corrected_sentence_split_words) > 0:
         for index in range(len(split_text)):
-            # Only take one mistake word
-
             word_suggestion = corrected_sentence_split_words[index]
-            if split_text[index] != word_suggestion and word_suggestion not in recommended_word_fixes:
+            if split_text[index] != word_suggestion and \
+                    word_suggestion not in recommended_word_fixes and \
+                    str(split_text[index]).lower() not in list(correct_word_list):
                 current_wrong_word = split_text[index]
                 recommended_word_fixes.append(str(corrected_sentence_split_words[index]).rstrip())
                 break
@@ -376,20 +381,20 @@ def spelling_corrector_analysis():
     FP = 0
     FN = 0
     counter = 0
-    for (word, is_correct) in word_set:
+    for (word, actual_word_is_correct) in word_set:
         print('counter: ', counter)
-        need_fix = analyze(word)
+        word_is_wrong = analyze(word)
         print('recommended_word_fixes: ', recommended_word_fixes)
 
-        if need_fix is True:
-            if is_correct is True:
+        if word_is_wrong:
+            if actual_word_is_correct:
                 wrong_count += 1
                 FP += 1
             else:
                 correct_count += 1
                 TP += 1
         else:
-            if is_correct is True:
+            if actual_word_is_correct:
                 correct_count += 1
                 TN += 1
             else:
@@ -397,15 +402,21 @@ def spelling_corrector_analysis():
                 FN += 1
         counter += 1
 
+    print('Summary of spell corrector analysis:')
     print('length of word_set: ', len(word_set))
+    print('TP: ', TP)
+    print('TN: ', TN)
+    print('FP: ', FP)
+    print('FN: ', FN)
     print('correct_count: ', correct_count)
+    print('wrong_count: ', wrong_count)
     accuracy = correct_count / len(word_set)
     precision = TP / (TP + FP)
     recall = TP / (TP + FN)
     f1 = 2 * precision * recall / (precision + recall)
     print('accuracy: ', accuracy * 100, '%')
     print('precision: ', precision * 100, '%')
-    print('recall: ', recall, '%')
+    print('recall: ', recall * 100, '%')
     print('f1: ', f1)
 
 

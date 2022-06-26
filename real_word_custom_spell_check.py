@@ -232,6 +232,7 @@ def initialize():
     print('correct_word_set: ', correct_word_set[:10])
     print('wrong_word_set: ', wrong_word_set[:10])
     print('len(word_set): ', len(word_set))
+    print('word_set: ', word_set[:10])
 
     # print(closest_word('acress'))
     # print(closest_all_sent('two of thew'))
