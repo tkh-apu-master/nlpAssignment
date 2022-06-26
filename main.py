@@ -10,6 +10,8 @@ from tkmacosx import Button
 
 from real_word_custom_spell_check import *
 
+nltk.download('punkt')
+
 # Strategy: Use Norvig with SymSpell approach, which improves speed, memory consumption and accuracy
 # Reference: https://towardsdatascience.com/spelling-correction-how-to-make-an-accurate-and-fast-corrector-dc6d0bcbba5f
 
@@ -99,38 +101,6 @@ def check_sentence_segmentation(split_text):
     # Return True to prevent further unnecessary checks
     if len(split_text) == 1 and len(recommended_sentence_fixes) == 1:
         return True
-
-    # # Step 2: Check if the sentence is correct with TextBlob
-    # textblob_sentence = TextBlob(current_sentence)
-    # corrected_sentence = textblob_sentence.correct()
-    #
-    # # Need to convert TextBlob object to string with filtered out '\n' first
-    # textblob_fixed_sentence = str(corrected_sentence)[:-1]
-    #
-    # corrected_sentence_split_words = nltk.word_tokenize(textblob_fixed_sentence)
-    # for index in range(len(split_text)):
-    #     # Only take one mistake word
-    #
-    #     word_suggestion = corrected_sentence_split_words[index]
-    #     if split_text[index] != word_suggestion and word_suggestion not in recommended_word_fixes:
-    #         current_wrong_word = split_text[index]
-    #         recommended_word_fixes.append(str(corrected_sentence_split_words[index]).rstrip())
-
-    # add_sentence_suggestion(textblob_fixed_sentence)
-
-    # # Step 3: Real-word sentence suggestions (Resource intensive)
-    # # Only allows numbers and characters
-    # if len(split_text) <= 6:
-    #     possible_sentence_combinations = closest_all_sent(current_sentence)
-    #     possible_sentence_combinations2 = closest_sent(current_sentence)
-    # else:
-    #     possible_sentence_combinations = []
-    #     possible_sentence_combinations2 = []
-    #
-    # for sentence in possible_sentence_combinations:
-    #     add_sentence_suggestion(sentence)
-    # for sentence in possible_sentence_combinations2:
-    #     add_sentence_suggestion(sentence)
 
     if len(recommended_sentence_fixes) > 0:
         mistake_sentence_label.config(text='Sentence suggestions:')
