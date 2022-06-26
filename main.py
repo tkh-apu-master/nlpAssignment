@@ -172,7 +172,7 @@ def analyze_text(split_text):
                     candidates = list(candidates)
                     candidates.sort()
                     print('step 1 candidates:', candidates)
-                    recommended_word_fixes.append(candidates)
+                    recommended_word_fixes = candidates
                 else:
                     recommended_word_fixes = []
                 break
