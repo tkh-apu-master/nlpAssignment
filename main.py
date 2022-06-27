@@ -334,6 +334,7 @@ def search_recommended_word(event):
 
     # If search_keyword is empty, show all recommended words as default
     if len(search_keyword) == 1:
+        recommended_fixes_search_result.clear()
         recommended_fixes_search_result.extend(recommended_word_fixes)
 
     for word in recommended_fixes_search_result:
